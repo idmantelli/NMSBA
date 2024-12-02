@@ -14,10 +14,12 @@ For more information on both modules, see:
 import paho.mqtt.client as mqtt
 import csv 
 from datetime import datetime
+from gpiozero import DigitalOutputDevice
 
 from tkinter import *
 from tkinter import ttk
 
+relay = DigitalOutputDevice(18) # Define the location of the pin that controls the relay
 broker_address = '10.42.0.1' # this is the IP address of the RPi 4
 client = mqtt.Client('Pi4') # this is the username of the RPi 4
 csv_filepath = '/home/pi4/Documents/moisture_logs/1.csv' # where to save the data
@@ -44,6 +46,10 @@ class App(Frame):
 		self.readback.tag_configure(
 			'moisture',font=('Calibri', 20, 'bold'),justify='center'
 		)
+
+		# Change these values depending on personal testing.
+		self.pump_upper_bound = 60
+		self.pump_lower_bound = 30
 		
 		# work in the MQTT client and callbacks
 		self.client = client
@@ -71,10 +77,10 @@ class App(Frame):
     		https://docs.python.org/3/library/csv.html
       		(As needed, Monty Python references have been scrubbed here)
 		"""
-		current_time = datetime.strftime('%y%m%d%H%M') # Format a string for the year, month, day, hour, and minute
+		current_time = datetime.now().strftime('%y%m%d%H%M') # Format a string for the year, month, day, hour, and minute
 		with open(self.filepath, 'a', newline='', 'utf-8') as csvfile:
 			writer = csv.writer(csvfile)
-			writer.writerow(current_time, data) # each line has time and moisture
+			writer.writerow([current_time, data]) # each line has time and moisture
 	
 	"""The following 8 lines are taken from the basic example provided
 	in the pypi.org source. There are three modifications:
@@ -100,6 +106,12 @@ class App(Frame):
 		self.current_moisture = msg.payload.decode("utf-8")
 		self.update_readback()
 		self.record_to_csv(self.current_moisture)
+
+		# Turn on the pump relay if the moisture is too low. Turn off when sufficiently high.
+		if self.readback < self.pump_lower_bound:
+			relay.on()
+		elif self.readback >= self.pump_upper_bound:
+			relay.off()
 
 	def startmqtt(self):
 		self.client.loop_start()
