@@ -46,7 +46,7 @@ class App(Frame):
 		self.readback.tag_configure(
 			'moisture',font=('Calibri', 20, 'bold'),justify='center'
 		)
-
+		self.csv_record_time = 0
 		# Change these values depending on personal testing.
 		self.pump_upper_bound = 60
 		self.pump_lower_bound = 30
@@ -101,16 +101,22 @@ class App(Frame):
 		"""React to receiving a message from a subscribed topic by
   		1) Updating the class attribute current_moisture to the message string;
     		2) Use the function update_readback() defined above to modify the GUI;
-      		3) Write the current time and current moisture to the csv file
+      		3) Write the current time and current moisture to the csv file;
+		4) Turn on/off the relay if soil moisture is low/high enough.
 		"""
 		self.current_moisture = msg.payload.decode("utf-8")
 		self.update_readback()
-		self.record_to_csv(self.current_moisture)
 
+		# Record soil moisture to the csv only once a minute to save on storage
+		now_time = int(datetime.now().strftime('%y%m%d%H%M'))
+		if now_time - self.csv_record_time >= 1:
+			self.record_to_csv(self.current_moisture)
+			self.csv_record_time = now_time
+		
 		# Turn on the pump relay if the moisture is too low. Turn off when sufficiently high.
-		if self.readback < self.pump_lower_bound:
+		if self.current_moisture < self.pump_lower_bound:
 			relay.on()
-		elif self.readback >= self.pump_upper_bound:
+		elif self.current_moisture >= self.pump_upper_bound:
 			relay.off()
 
 	def startmqtt(self):
