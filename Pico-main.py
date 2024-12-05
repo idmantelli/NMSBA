@@ -10,8 +10,6 @@ led = Pin("LED", Pin.OUT) # Initialize the onboard LED
 # HUM_TEMP = Pin(2, Pin.IN) # Define the humidity/temperature sensor
 relay = Pin(18, Pin.OUT) # Define the location and behavior of the water pump relay
 SOIL1 = ADC(Pin(26)) # Define the location of the first soil moisture sensor
-# SOIL2 = ADC(Pin(27))
-# SOIL3 = ADC(Pin(28))
 HI_ADC = 48600 # Initialize the 'dry' ADC reading
 LO_ADC = 19400 # Initialize the 'wet' ADC reading
 
@@ -27,7 +25,6 @@ async def up(client): # respond to connectivity being (re)established
     while True:
         await client.up.wait() # wait on event
         client.up.clear()
-        
 
 def read_sensor(sensor, sensor_high_value, sensor_low_value):
     """Read a sensor and convert the raw ADC value to a 'human-readable' percentage.
@@ -91,52 +88,22 @@ def calibrate_sensor_100(sensor):
 button_calibrate_0_per.when_pressed = calibrate_sensor_0
 button_calibrate_100_per.when_pressed = calibrate_sensor_100
 
-# These bounds are arbitrary starting values. MQTT communication between Pico and Pi
-# could modify these values, or they can be changed manually.
-pump_upper_bound = 70 # percent
-pump_lower_bound = 40 # percent
-async def pump_relay(sensor, sensor_high_value, sensor_low_value):
-    """
-    Turn on the pump (send a high voltage (3.3V) to a relay) if the soil moisture
-    is below a defined percent. Turn off the pump (send a low voltage to a relay)
-    if the soil moisture is above a defined percent. The code checks this condition
-    only once every 5 seconds to save on power consumption. 
-    
-    Definitions of arguments:
-    -sensor: name of ADC input defined at the top (for example, SOIL1)
-    -sensor_high_value = highest ADC value, associated with sensor reading in air
-    -sensor_low_value = lowest ADC value, associated with sensor reading in water
-    """
-    while True:
-        await asyncio.sleep(1) # check the moisture levels every 5 seconds to save power
-        moisture = read_sensor(SOIL1, HI_ADC, LO_ADC) # use the function above
-        if moisture < pump_lower_bound: # if the soil moisture is below bounds,
-            relay.value(1) # make the pin high to turn on the relay.
-        elif moisture > pump_upper_bound: # if the soil moisture is above bounds,
-            relay.value(0) # make the pin low to turn off the relay.
-
-async def measure_moisture(sensor1, sensor2=None, sensor3=None):
-    """ Use the first function we defined to read up to 3 soil moisture sensors.
-    This function requires that at least one sensor is connected properly, but
-    not all 3 sensors need to be connected. Every 30 seconds, take a new reading
-    from any enabled sensors and publish the value to the associated topic. The Pi
-    on the other end will receive that value and be able to display it.
+async def measure_moisture(sensor1):
+    """ Use the first function we defined to read soil moisture sensors.
+    Every 30 seconds, take a new reading from any enabled sensors and publish 
+    the value to the associated topic. The Pi on the other end will receive 
+    that value and be able to display it.
     
     See Paho's PyPi docs for the original text of client.publish(...).
     
     Definitions of arguments:
     -sensor1: name of first ADC input defined at the top of the code
-    -sensor2: name of second ADC input. Default value is None.
-    -sensor3: name of third ADC input. Default value is None.
     """
     while True:
         await asyncio.sleep(1) # measure moisture every n seconds.
         moisture1 = read_sensor(SOIL1, HI_ADC, LO_ADC)
-        # moisture2 = read_sensor(SOIL2, HI_ADC, LO_ADC)
-        # moisture3 = read_sensor(SOIL3, HI_ADC, LO_ADC)
         await client.publish(f'soilmoisture/{pico_name}/sensor1', f'{moisture1}', qos = 1)
-        #await client.publish(f'soilmoisture/{pico_name}/sensor2', f'{moisture2}', qos = 1)
-        #await client.publish(f'soilmoisture/{pico_name}/sensor2', f'{moisture2}', qos = 1)
+
 
 """The following block of code is an example of using the MQTT protocol to subscribe to a
 topic that the Raspberry Pi publishes to. In theory, the Pi could publish new min/max
