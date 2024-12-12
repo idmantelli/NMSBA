@@ -78,7 +78,7 @@ class App(Frame):
       		(As needed, Monty Python references have been scrubbed here)
 		"""
 		current_time = datetime.now().strftime('%y%m%d%H%M') # Format a string for the year, month, day, hour, and minute
-		with open(self.filepath, 'a', newline='', 'utf-8') as csvfile:
+		with open(self.filepath, 'a', newline='', encoding='utf-8') as csvfile:
 			writer = csv.writer(csvfile)
 			writer.writerow([current_time, data]) # each line has time and moisture
 	
